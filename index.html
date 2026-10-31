@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>🐴 Radar Nostr</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b12'/%3E%3Ctext x='16' y='24' font-size='19' text-anchor='middle'%3E%F0%9F%90%B4%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#0b0b12;--panel:#13131d;--panel-2:#1b1b28;--line:#262636;--text:#e7e7f0;--muted:#8a8aa3;--accent:#a78bfa;--orange:#f7931a}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+main{max-width:1180px;margin:0 auto;padding:18px 14px 42px}
+code{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:.85em}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.live-dot{width:9px;height:9px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px #4ade80;align-self:center;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.brand h1{font-size:22px;letter-spacing:-.02em}
+.tag{color:var(--muted);font-size:13px}
+.stats{display:flex;flex-wrap:wrap;gap:4px 18px}
+.stats>div{text-align:right;min-width:52px}
+.stats b{display:block;font-size:19px;font-weight:700;color:var(--text)}
+.stats span{font-size:11px;color:var(--muted);text-transform:lowercase}
+.grid{display:grid;grid-template-columns:1.08fr 1fr;gap:14px;margin-bottom:14px}
+.grid-bottom{grid-template-columns:1.15fr 1fr}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px 16px;min-width:0}
+.panel h2{font-size:16px;font-weight:650;margin-bottom:10px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.panel h2 small{font-size:11.5px;font-weight:400;color:var(--muted)}
+.bubbles{position:relative;height:430px;overflow:hidden;border-radius:10px}
+.bubbles .empty,.feed .empty,.rank-list .empty{color:var(--muted);font-size:13.5px;padding:26px 8px;text-align:center;list-style:none}
+.bubble-pos{position:absolute;left:0;top:0;transition:none}
+.bubble{width:100%;height:100%;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8%;color:var(--text);font:inherit;transition:border-color .3s,box-shadow .3s}
+.bubble:hover{border-color:var(--accent)}
+.bubble.hot{border-color:var(--accent);box-shadow:0 0 22px rgba(167,139,250,.28)}
+.bubble-logo{width:46%;display:grid;place-items:center}
+.bubble-logo img{width:100%;height:100%;border-radius:30%;object-fit:cover;background:var(--panel)}
+.bubble-logo .letter{font-weight:700;font-size:clamp(14px,3vw,26px);color:var(--accent)}
+.bubble-name{font-size:clamp(10px,1.5vw,13.5px);font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bubble-count{font-size:clamp(10px,1.4vw,13px);color:var(--muted)}
+.feed-panel{display:flex;flex-direction:column;min-height:430px}
+.feed{list-style:none;overflow-y:auto;max-height:520px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+.feed-panel .feed{max-height:432px}
+.feed-item{--cat:#94a3b8;border-radius:10px}
+.feed-row{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:10px}
+.feed-row:hover{background:var(--panel-2)}
+.av{width:34px;height:34px;border-radius:50%;flex-shrink:0;object-fit:cover;background:var(--panel-2);display:grid;place-items:center;font-weight:700;font-size:14px}
+.feed-body{flex:1;min-width:0}
+.feed-line{font-size:13.5px}
+.feed-line strong{font-weight:650}
+.feed-line>span{color:var(--muted)}
+.app-chip{display:inline-flex;align-items:center;gap:5px;margin-left:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:1px 7px 1px 3px;font-size:11.5px;color:var(--muted);vertical-align:1px}
+.app-chip img{width:16px;height:16px;border-radius:4px;object-fit:cover;background:var(--panel)}
+.preview{color:var(--muted);font-size:12.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.cat-dot{width:8px;height:8px;border-radius:50%;background:var(--cat)}
+.feed-meta time,.zap-time{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.zap-stats{color:var(--muted);font-size:13px;margin-bottom:8px}
+.zap-stats b{color:var(--text);font-weight:700;font-size:15px}
+.zap-row .bolt{color:var(--orange)}
+.ranking-controls{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.tabs{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:2px}
+.tab{background:none;border:0;border-radius:7px;color:var(--muted);font:inherit;font-size:12px;padding:4px 10px;cursor:pointer}
+.tab.active{background:var(--panel);color:var(--text)}
+.rank-list{list-style:none;display:flex;flex-direction:column;gap:2px}
+.rank-row{display:grid;grid-template-columns:20px 24px minmax(70px,150px) 1fr auto auto;gap:9px;align-items:center;width:100%;background:none;border:0;border-radius:9px;padding:6px 7px;cursor:pointer;color:var(--text);font:inherit;text-align:left}
+.rank-row:hover{background:var(--panel-2)}
+.rank-pos{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.rank-row img,.rank-row .letter-av{width:24px;height:24px;border-radius:6px;object-fit:cover;background:var(--panel-2);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--accent)}
+.rank-name{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-bar{height:6px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+.rank-bar span{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#7c5ce0,var(--accent))}
+.rank-count{font-size:13.5px;font-variant-numeric:tabular-nums;font-weight:600}
+.rank-trend{font-size:11px;min-width:44px;text-align:right}
+.rank-trend.up{color:#4ade80}.rank-trend.down{color:#f87171}.rank-trend.flat{color:var(--muted)}
+.pulse{display:flex;flex-direction:column;gap:10px}
+.pulse-bars{display:flex;align-items:flex-end;gap:2px;height:120px}
+.pulse-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;min-width:0;height:100%;border-radius:2px 2px 0 0}
+.pulse-col div{border-radius:2px 2px 0 0}
+.pulse-legend{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:3px 11px 3px 8px;font-size:12px;color:var(--muted);cursor:pointer}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip.active{border-color:var(--accent);color:var(--text)}
+.chip b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.modal-bg{position:fixed;inset:0;background:rgba(5,5,10,.7);display:none;place-items:center;z-index:50;padding:16px}
+.modal-bg.open{display:grid}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(420px,100%);display:flex;flex-direction:column;gap:10px}
+.modal img{width:52px;height:52px;border-radius:12px;object-fit:cover;background:var(--panel-2)}
+.modal h3{font-size:18px}
+.modal .site{color:var(--accent);font-size:13px;word-break:break-all}
+.modal .kv{display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted)}
+.modal .kv b{color:var(--text)}
+.modal .close{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 14px;cursor:pointer;font:inherit;font-size:13px}
+footer{color:var(--muted);font-size:11.5px;text-align:center;margin-top:18px}
+.panel h2.clickable{cursor:pointer}
+.panel h2.clickable:hover{color:var(--accent)}
+.page{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;display:none;padding:18px 14px 60px}
+.page.open{display:block}
+.page-inner{max-width:1180px;margin:0 auto}
+.page-top{display:flex;align-items:baseline;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.back-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:5px 14px;cursor:pointer;font:inherit;font-size:13px}
+.back-btn:hover{color:var(--text);border-color:var(--accent)}
+.page-top h1{font-size:20px;letter-spacing:-.02em}
+.page-top .tag{color:var(--muted);font-size:13px}
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.app-card{display:flex;flex-direction:column;gap:10px;transition:border-color .6s,box-shadow .6s}
+.app-card.flash{border-color:var(--accent);box-shadow:0 0 22px rgba(167,139,250,.32);transition:none}
+.app-card-head{display:flex;gap:10px;align-items:center;min-width:0}
+.app-card-head img{width:38px;height:38px;border-radius:10px;object-fit:cover;background:var(--panel-2);flex-shrink:0}
+.app-card-head .lav{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:700;color:var(--accent);background:var(--panel-2);flex-shrink:0}
+.app-card-head b{display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-card-head .host{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-card-stats{margin-left:auto;text-align:right;color:var(--muted);font-size:11px;line-height:1.5;flex-shrink:0}
+.app-card-stats b{display:block;color:var(--text);font-size:17px;font-variant-numeric:tabular-nums}
+.spark{display:flex;align-items:flex-end;gap:2px;height:36px}
+.spark i{flex:1;background:var(--panel-2);border-radius:2px 2px 0 0;min-height:3px}
+.spark i.on{background:var(--accent)}
+.mini-row{display:flex;gap:8px;align-items:baseline;padding:4px 6px;border-radius:8px;font-size:12.5px;min-width:0}
+.mini-row:hover{background:var(--panel-2)}
+.mini-row .cat-dot{flex-shrink:0;align-self:center}
+.mini-row time{margin-left:auto;color:var(--muted);font-size:10.5px;flex-shrink:0;padding-left:6px}
+.mini-row .who{font-weight:600;flex-shrink:0;max-width:35%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-row .what{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:900px){.grid,.grid-bottom{grid-template-columns:1fr}.bubbles{height:360px}.feed{max-height:420px}.stats{width:100%;justify-content:space-between}.stats>div{text-align:left}.rank-row{grid-template-columns:18px 22px minmax(60px,1fr) 1fr auto auto;gap:7px}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="brand"><span class="live-dot"></span><h1>Radar Nostr</h1><span class="tag">which apps people are using, right now</span></div>
+    <div class="stats">
+      <div id="st-relays" title=""><b>0/12</b><span>relays</span></div>
+      <div><b id="st-events">0</b><span>events</span></div>
+      <div><b id="st-apps">0</b><span>active apps</span></div>
+      <div><b id="st-signed">0%</b><span>signed</span></div>
+      <div><b id="st-new">0</b><span>new apps</span></div>
+      <div><b id="st-bots">0</b><span>bots filtered</span></div>
+    </div>
+  </header>
+
+  <section class="grid">
+    <div class="panel">
+      <h2 class="clickable" id="apps-link" title="Open the live apps page">Active apps <small>last 5 min · tap one for details · live page ↗</small></h2>
+      <div class="bubbles" id="bubbles"><div class="empty">Listening to relays… apps that sign their events with the <code>client</code> tag will show up here.</div></div>
+    </div>
+    <div class="panel feed-panel">
+      <h2>Live <small id="feed-note"></small></h2>
+      <ul class="feed" id="feed"><li class="empty">Waiting for activity…</li></ul>
+    </div>
+  </section>
+
+  <section class="grid grid-bottom">
+    <div class="panel">
+      <h2>Ranking <small id="rank-note">counted 24/7</small></h2>
+      <div class="ranking">
+        <div class="ranking-controls">
+          <div class="tabs" role="tablist" aria-label="Period" id="rank-period">
+            <button role="tab" class="tab active" data-p="3600">Last hour</button>
+            <button role="tab" class="tab" data-p="86400">24 h</button>
+            <button role="tab" class="tab" data-p="604800">7 days</button>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Ranked by" id="rank-metric">
+            <button role="tab" class="tab active" data-m="ev">Events</button>
+            <button role="tab" class="tab" data-m="sats">⚡ Sats</button>
+            <button role="tab" class="tab" data-m="users">👤 Users</button>
+            <button role="tab" class="tab" data-m="new">✨ New</button>
+          </div>
+        </div>
+        <ol class="rank-list" id="rank-list"><li class="empty">Counting…</li></ol>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Zaps <small>every zap, live</small></h2>
+      <div class="zap-stats"><b id="zap-rate">0</b> zaps/min&nbsp;&nbsp;<b id="zap-sats">0</b> sats · last 5 min</div>
+      <ul class="feed" id="zaps"><li class="empty">Waiting for zaps…</li></ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Pulse <small>events by category · tap one to filter the live feed</small></h2>
+    <div class="pulse">
+      <div class="tabs" role="tablist" aria-label="Period" id="pulse-period">
+        <button role="tab" class="tab active" data-p="live">Live 30 min</button>
+        <button role="tab" class="tab" data-p="day">24 h</button>
+        <button role="tab" class="tab" data-p="week">7 days</button>
+      </div>
+      <div class="pulse-bars" id="pulse-bars"></div>
+      <div class="pulse-legend" id="pulse-legend"></div>
+    </div>
+  </section>
+
+  <footer>Independent clone · vanilla JS speaking raw NIP-01 over WebSockets — no NDK, no build step, no backend. History is kept in your browser.</footer>
+</main>
+
+<div class="page" id="apps-page">
+  <div class="page-inner">
+    <div class="page-top">
+      <button class="back-btn" id="apps-back">← Radar</button>
+      <h1>Active apps</h1><span class="tag">live · every event as it lands · last 5 min</span>
+    </div>
+    <div class="apps-grid" id="apps-grid"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+'use strict';
+window.__errs = [];
+window.addEventListener('error', e => window.__errs.push(e.message));
+window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)));
+
+const $ = s => document.querySelector(s);
+const NOW = () => Math.floor(Date.now() / 1000);
+const RELAYS = ["wss://relay.damus.io","wss://nos.lol","wss://relay.primal.net","wss://relay.snort.social","wss://relay.ditto.pub","wss://relay.nostr.net","wss://nostr.wine","wss://offchain.pub","wss://nostr.oxtr.dev","wss://nostr.bitcoiner.social","wss://nostr-pub.wellorder.net","wss://nostr.walletofsatoshi.com"];
+const META_RELAYS = ["wss://purplepag.es","wss://user.kindpag.es","wss://relay.primal.net","wss://relay.damus.io"];
+const KINDS = [1,6,8,20,21,22,1018,1063,1068,1111,1222,1311,1337,1617,9041,9321,9735,9802,30009,30023,30063,30078,30311,30402,30617,31337,31922,31923,31989,31990,32267,34235,34550,36787,39089,5000,5001,5002,5050,5100,5300,5302,6050,6100,6300];
+const KM = {
+  1:{c:'social',v:'posted a note'}, 6:{c:'social',v:'reposted'}, 7:{c:'social',v:'reacted'},
+  8:{c:'other',v:'awarded a badge'}, 20:{c:'photo',v:'posted a photo'}, 21:{c:'video',v:'posted a video'},
+  22:{c:'video',v:'posted a short video'}, 1063:{c:'photo',v:'shared a file'}, 1018:{c:'social',v:'voted in a poll'},
+  1068:{c:'social',v:'created a poll'}, 1111:{c:'social',v:'commented'}, 1222:{c:'social',v:'sent a voice note'},
+  1311:{c:'live',v:'wrote in a live chat'}, 1337:{c:'dev',v:'shared code'}, 1617:{c:'dev',v:'sent a patch'},
+  9041:{c:'zap',v:'created a zap goal'}, 9321:{c:'zap',v:'sent a nutzap'}, 9735:{c:'zap',v:'received a zap'},
+  9802:{c:'article',v:'highlighted a text'}, 30009:{c:'other',v:'created a badge'}, 30023:{c:'article',v:'published an article'},
+  30063:{c:'ecosystem',v:'released an app version'}, 30078:{c:'other',v:'saved app data',q:1},
+  30311:{c:'live',v:'is streaming live'}, 30402:{c:'market',v:'posted a listing'}, 30617:{c:'dev',v:'announced a git repo'},
+  31922:{c:'other',v:'created a calendar event'}, 31923:{c:'other',v:'created a calendar event'},
+  31337:{c:'music',v:'uploaded a track'}, 31989:{c:'ecosystem',v:'recommended an app'},
+  31990:{c:'ecosystem',v:'published an app 🆕'}, 32267:{c:'ecosystem',v:'published an app'},
+  34235:{c:'video',v:'posted a video'}, 34550:{c:'social',v:'created a community'},
+  36787:{c:'music',v:'uploaded a track'}, 39089:{c:'social',v:'made a follow pack'}
+};
+const CATS = {social:{label:'Social',color:'#a78bfa'},photo:{label:'Photos',color:'#f472b6'},video:{label:'Video',color:'#fb7185'},article:{label:'Articles',color:'#fbbf24'},live:{label:'Live',color:'#f87171'},dev:{label:'Dev / Git',color:'#34d399'},dvm:{label:'DVMs',color:'#22d3ee'},music:{label:'Music',color:'#e879f9'},market:{label:'Market',color:'#a3e635'},zap:{label:'Zaps',color:'#f7931a'},ecosystem:{label:'Ecosystem',color:'#60a5fa'},other:{label:'Other',color:'#94a3b8'}};
+const APPS = {"damus":{"name":"Damus","website":"https://damus.io","icon":"https://damus.io/favicon.ico"},"notedeck":{"name":"Notedeck","website":"https://damus.io/notedeck","icon":"https://damus.io/favicon.ico"},"amethyst":{"name":"Amethyst","website":"https://amethyst.social","icon":"https://amethyst.social/amethyst-logo.jpg"},"primal":{"name":"Primal","website":"https://primal.net","icon":"https://primal.net/assets/apple-touch-icon-a536f430.png"},"snort":{"name":"Snort","website":"https://snort.social","icon":"https://snort.social/img/apple-touch-icon.png"},"iris":{"name":"Iris","website":"https://iris.to","icon":"https://iris.to/img/apple-touch-icon.png"},"coracle":{"name":"Coracle","website":"https://coracle.social","icon":"https://coracle.social/icons/apple-touch-icon-180x180.png"},"flotilla":{"name":"Flotilla","website":"https://flotilla.social","icon":"https://flotilla.social/apple-touch-icon.png"},"nostrudel":{"name":"noStrudel","website":"https://nostrudel.ninja","icon":"https://nostrudel.ninja/apple-touch-icon.png"},"jumble":{"name":"Jumble","website":"https://jumble.social","icon":"https://jumble.social/favicon.ico"},"nos":{"name":"Nos"},"nostur":{"name":"Nostur","website":"https://nostur.com","icon":"https://nostur.com/apple-touch-icon.png"},"nostria":{"name":"Nostria","website":"https://nostria.app","icon":"https://nostria.app/icons/icon-512x512-maskable.png"},"yakihonne":{"name":"YakiHonne","website":"https://yakihonne.com","icon":"https://yakihonne.com/favicon.ico"},"habla":{"name":"Habla","website":"https://habla.news"},"hablanews":{"name":"Habla","website":"https://habla.news"},"highlighter":{"name":"Highlighter","website":"https://highlighter.com","icon":"https://highlighter.com/apple-touch-icon-180x180.png"},"olas":{"name":"Olas","website":"https://olas.app","icon":"https://olas.app/favicon.png"},"zapstream":{"name":"zap.stream","website":"https://zap.stream","icon":"https://zap.stream/logo.png"},"wavlake":{"name":"Wavlake","website":"https://wavlake.com","icon":"https://wavlake.com/apple-touch-icon.png"},"fountain":{"name":"Fountain","website":"https://fountain.fm","icon":"https://fountain.fm/favicon.ico"},"zapstore":{"name":"Zapstore","website":"https://zapstore.dev","icon":"https://raw.githubusercontent.com/zapstore/zapstore/master/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"},"shopstr":{"name":"Shopstr","website":"https://shopstr.store"},"plebeianmarket":{"name":"Plebeian Market","website":"https://plebeian.market","icon":"https://plebeian.market/logo-st5zpap9.svg"},"nostter":{"name":"nostter","website":"https://nostter.app","icon":"https://nostter.app/apple-touch-icon.png"},"lumilumi":{"name":"Lumilumi","website":"https://lumilumi.app","icon":"https://lumilumi.app/apple-touch-icon-180x180.png"},"flycat":{"name":"Flycat","website":"https://flycat.club"},"satellite":{"name":"Satellite","website":"https://satellite.earth","icon":"https://satellite.earth/apple-touch-icon.png"},"chachi":{"name":"Chachi","website":"https://chachi.chat"},"ditto":{"name":"Ditto","website":"https://ditto.pub","icon":"https://ditto.pub/apple-touch-icon.png"},"stemstr":{"name":"Stemstr","website":"https://stemstr.app"},"pinstr":{"name":"Pinstr"},"formstr":{"name":"Formstr","website":"https://formstr.app","icon":"https://formstr.app/logo192.png"},"listr":{"name":"Listr","website":"https://listr.lol","icon":"https://listr.lol/apple-touch-icon.png"},"nostree":{"name":"Nostree","website":"https://nostree.me"},"zapcooking":{"name":"zap.cooking","website":"https://zap.cooking"},"0xchat":{"name":"0xchat","website":"https://0xchat.com","icon":"https://0xchat.com/favi.png"},"wisp":{"name":"Wisp","website":"https://wisp.mobile","icon":"https://raw.githubusercontent.com/barrydeen/wisp/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"},"darkwisp":{"name":"Dark Wisp","website":"https://github.com/barrydeen/dark-wisp-android","icon":"https://raw.githubusercontent.com/barrydeen/dark-wisp-android/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"},"nostrich":{"name":"Nostrich","website":"https://nostrich.org","icon":"https://nostrich.org/apple-touch-icon.png"},"divine":{"name":"diVine","website":"https://divine.video","icon":"https://divine.video/app_icon.png"},"divinevideo":{"name":"diVine","website":"https://divine.video","icon":"https://divine.video/app_icon.png"},"zeus":{"name":"Zeus","website":"https://zeusln.com","icon":"https://raw.githubusercontent.com/ZeusLN/zeus/master/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"},"cashume":{"name":"Cashu.me","website":"https://cashu.me","icon":"https://cashu.me/apple-icon.png"},"amber":{"name":"Amber","website":"https://github.com/greenart7c3/Amber","icon":"https://raw.githubusercontent.com/greenart7c3/Amber/master/fastlane/metadata/android/en-US/images/icon.png"},"shosho":{"name":"Shosho","website":"https://shosho.live","icon":"https://shosho.live/apple-touch-icon.png"},"armada":{"name":"Armada","website":"https://armada.buzz","icon":"https://armada.buzz/apple-touch-icon.png"},"obelisk":{"name":"Obelisk","website":"https://obelisk.ar","icon":"https://obelisk.ar/obelisk-favicon.png"}};
+const BOT_KEYS = new Set(['mostr','jqw22githubio','posterchan','posterchanai','sonarstatus','loreplaystreaming']);
+const BOT_PRE = ['orignexus','zhenguo'];
+const PLAT = new Set(['android','ios','web','desktop','mobile','app','client','beta','alpha']);
+const VRE = /^v?\d+(\.\d+)*([-+].*)?$/;
+const BOLT = {'':1e8, m:1e5, u:100, n:.1, p:1e-4};
+const RATE_KINDS = new Set([1,6,1111,1063]);
+const PALETTE = ['#2d4976','#5b3a7e','#7e3a3a','#3a6e5b','#6e5b26','#4a3a6e','#6e3a52','#3a5b6e'];
+const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e4 ? (n/1e3).toFixed(1)+'k' : String(n);
+
+function normApp(s){
+  if (typeof s !== 'string') return '';
+  return s.toLowerCase().split(/[\s/()]+/).filter(w => w && !VRE.test(w) && !PLAT.has(w)).join('').replace(/[^a-z0-9]/g,'');
+}
+const isBotKey = k => BOT_KEYS.has(k) || BOT_PRE.some(p => k.startsWith(p)) || k.endsWith('bot');
+function bolt11Sats(inv){
+  const m = /^ln(?:bc|tb|bcrt|tbs)(\d+)([munp]?)1/i.exec(inv || '');
+  return m ? Math.round(Number(m[1]) * BOLT[m[2].toLowerCase()]) : null;
+}
+const hrB = t => Math.floor(t / 3600);
+const relTime = t => { const s = Math.max(0, NOW() - t);
+  if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s/60) + ' min';
+  if (s < 86400) return Math.floor(s/3600) + ' h'; const d = Math.floor(s/86400); return d + (d===1?' day':' days'); };
+const shortPk = p => p ? p.slice(0,6) + '…' + p.slice(-4) : '?';
+const nameOf = pk => { const p = S.profiles.get(pk); return (p && (p.name)) || shortPk(pk); };
+const picOf = pk => { const p = S.profiles.get(pk); return p && p.picture || null; };
+function avColor(pk){ let h = 0; for (const ch of pk || 'x') h = (h*31 + ch.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; }
+function avHtml(pk){ const pic = picOf(pk); const nm = nameOf(pk);
+  return pic ? '<img class="av" loading="lazy" referrerpolicy="no-referrer" src="'+pic+'">'
+   : '<div class="av" style="background:'+avColor(pk)+';color:#fff">'+(nm[0]||'?').toUpperCase()+'</div>'; }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- state ---------- */
+const S = {
+  relayOk: new Set(), relayState: new Map(RELAYS.map(r => [r, 0])),
+  stats: {ev:0, signed:0, bots:0, news:0},
+  apps: new Map(), appsByPk: new Map(),
+  profiles: new Map(), pq: new Set(), aq: new Map(),
+  zaps: [], feed: [], appFeeds: new Map(),
+  minB: new Map(), hrB: new Map(),
+  seen: new Set(), rate: new Map(),
+  filter: null, rankP: 3600, rankM: 'ev', pulseP: 'live',
+  lastRank: 0, saved: 0
+};
+function getApp(key){
+  let a = S.apps.get(key);
+  if (!a) {
+    a = {key, name: (APPS[key] && APPS[key].name) || key, icon: (APPS[key] && APPS[key].icon) || null,
+         site: (APPS[key] && APPS[key].website) || null, pk: null, first: NOW(), last: 0, sats: 0,
+         satsH: new Map(), hrs: new Map(), users: new Map(), ts: [], min: new Map()};
+    const had = S.knownKeys && S.knownKeys.has(key);
+    if (!had) S.stats.news++;
+    S.apps.set(key, a);
+  }
+  return a;
+}
+function countAppEvent(a, actor, t){
+  a.last = t; a.ts.push(t);
+  const mk = Math.floor(t / 60);
+  a.min.set(mk, (a.min.get(mk) || 0) + 1);
+  const h = hrB(t);
+  a.hrs.set(h, (a.hrs.get(h) || 0) + 1);
+  let us = a.users.get(h); if (!us) { us = new Set(); a.users.set(h, us); }
+  us.add(actor);
+}
+function bumpBucket(map, key, cat, n){
+  let m = map.get(key); if (!m) { m = new Map(); map.set(key, m); }
+  m.set(cat, (m.get(cat) || 0) + n);
+}
+
+/* ---------- persistence ---------- */
+const LS = 'radar-nostr-clone-v1';
+function save(){
+  try {
+    const apps = [...S.apps.values()].slice(0, 400).map(a => ({
+      k: a.key, n: a.name, i: a.icon, s: a.site, p: a.pk, f: a.first, sa: a.sats,
+      h: [...a.hrs].slice(-192), sh: [...a.satsH].slice(-192),
+      u: [...a.users].slice(-192).map(([h, set]) => [h, [...set].slice(0, 60)])
+    }));
+    const blob = {v: 1, t: NOW(), apps, minB: [...S.minB].slice(-1500).map(([k, m]) => [k, [...m]]),
+      hrB: [...S.hrB].slice(-200).map(([k, m]) => [k, [...m]]),
+      zaps: S.zaps.slice(0, 120), profiles: [...S.profiles].slice(0, 250)};
+    let str = JSON.stringify(blob);
+    try { localStorage.setItem(LS, str); } catch (e) { blob.profiles = []; localStorage.setItem(LS, JSON.stringify(blob)); }
+  } catch (e) { window.__errs.push('save: ' + e.message); }
+}
+function load(){
+  let blob = null;
+  try { blob = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) {}
+  if (!blob) return;
+  S.knownKeys = new Set((blob.apps || []).map(a => a.k));
+  for (const a of blob.apps || []) {
+    const rec = getApp(a.k);
+    rec.name = a.n || rec.name; rec.icon = a.i || rec.icon; rec.site = a.s || rec.site;
+    rec.pk = a.p || null; rec.first = a.f || NOW(); rec.sats = a.sa || 0;
+    rec.hrs = new Map(a.h || []); rec.satsH = new Map(a.sh || []);
+    rec.users = new Map((a.u || []).map(([h, arr]) => [h, new Set(arr)]));
+    rec.min = new Map();
+    rec.ts = [];
+    if (rec.pk) S.appsByPk.set(rec.pk, a.k);
+  }
+  S.knownKeys = null;
+  S.stats.news = 0;
+  for (const [k, m] of blob.minB || []) if (Array.isArray(m)) S.minB.set(k, new Map(m));
+  for (const [k, m] of blob.hrB || []) if (Array.isArray(m)) S.hrB.set(k, new Map(m));
+  S.zaps = blob.zaps || [];
+  S.profiles = new Map(blob.profiles || []);
+}
+
+/* ---------- nostr wire (raw NIP-01, no NDK) ---------- */
+let subSeq = 0;
+function connectRelay(url, idx){
+  let ws;
+  try { ws = new WebSocket(url); } catch (e) { retry(); return; }
+  const sub = 'radar';
+  const timer = setTimeout(() => { if (ws.readyState === 1) { try { ws.close(); } catch (e) {} } }, 12000);
+  ws.onopen = () => {
+    clearTimeout(timer);
+    S.relayOk.add(url); S.relayState.set(url, 1);
+    ws.send(JSON.stringify(['REQ', sub, {kinds: KINDS, since: NOW() - 90}]));
+  };
+  ws.onmessage = m => {
+    let msg; try { msg = JSON.parse(m.data); } catch (e) { return; }
+    if (msg[0] === 'EVENT' && msg[1] === sub) handleEvent(msg[2]);
+  };
+  ws.onclose = retry; ws.onerror = () => {};
+  function retry(){
+    clearTimeout(timer);
+    S.relayOk.delete(url); S.relayState.set(url, 0);
+    setTimeout(() => connectRelay(url, idx), 8000 + Math.min(idx * 1500, 12000));
+  }
+}
+
+/* metadata pool: profiles (kind 0) + app handlers (kind 31990) */
+let metaWs = [], metaRR = 0;
+function connectMeta(){
+  META_RELAYS.forEach(url => {
+    try {
+      const ws = new WebSocket(url);
+      ws.onmessage = m => {
+        let msg; try { msg = JSON.parse(m.data); } catch (e) { return; }
+        if (msg[0] === 'EVENT') {
+          const ev = msg[2];
+          if (ev.kind === 0 && S.pqHandled && S.pqHandled.has(ev.pubkey)) {
+            let j = null; try { j = JSON.parse(ev.content); } catch (e) {}
+            if (j) S.profiles.set(ev.pubkey, {name: j.display_name || j.name || null, picture: j.picture || j.image || null});
+          } else if (ev.kind === 31990) {
+            ingest31990(ev);
+          }
+        }
+      };
+      metaWs.push(ws);
+    } catch (e) {}
+  });
+}
+function metaSend(payload){
+  const live = metaWs.filter(w => w.readyState === 1);
+  if (!live.length) return;
+  live[metaRR++ % live.length].send(JSON.stringify(payload));
+}
+function flushProfileQueue(){
+  if (!S.pq.size) return;
+  const batch = [...S.pq].slice(0, 80);
+  batch.forEach(pk => S.pq.delete(pk));
+  S.pqHandled = new Set([...(S.pqHandled || []), ...batch]);
+  if (S.pqHandled.size > 5000) S.pqHandled = new Set([...S.pqHandled].slice(-2500));
+  const sub = 'p' + (subSeq++);
+  metaSend(['REQ', sub, {kinds: [0], authors: batch}]);
+  setTimeout(() => metaSend(['CLOSE', sub]), 6000);
+}
+function queueAppMeta(ct){
+  // ct: ['client', name, url?, '31990:pk:d'?]
+  const ptr = ct[3] || '';
+  const key = normApp(ct[1]);
+  if (S.aq.has(key)) return;
+  S.aq.set(key, 1);
+  const a = getApp(key);
+  if (!a.name || a.name === key) a.name = ct[1];
+  if (!a.site && /^https?:\/\//.test(ct[2] || '')) a.site = ct[2];
+  if (!a.icon && a.site) a.icon = a.site.replace(/\/+$/, '') + '/favicon.ico';
+  const m = /^31990:([0-9a-f]{64}):(.+)$/.exec(ptr);
+  if (m) {
+    const sub = 'a' + (subSeq++);
+    metaSend(['REQ', sub, {kinds: [31990], authors: [m[1]], '#d': [m[2]]}]);
+    setTimeout(() => metaSend(['CLOSE', sub]), 6000);
+  }
+}
+function ingest31990(ev){
+  let j = null; try { j = JSON.parse(ev.content); } catch (e) {}
+  if (!j) return;
+  const d = (ev.tags || []).find(t => t[0] === 'd');
+  const key = normApp(d ? d[1] : (j.display_name || j.name || ''));
+  if (!key || isBotKey(key)) return;
+  const a = getApp(key);
+  if (j.display_name || j.name) a.name = j.display_name || j.name;
+  if (j.picture || j.image) a.icon = j.picture || j.image;
+  const web = (ev.tags || []).find(t => t[0] === 'web');
+  if (web) a.site = web[1].split('<bech32>')[0];
+  else if (j.website) a.site = j.website;
+  a.pk = ev.pubkey;
+  S.appsByPk.set(ev.pubkey, key);
+}
+/* ---------- event handling ---------- */
+function handleEvent(ev){
+  if (!ev || !ev.id || S.seen.has(ev.id)) return;
+  S.seen.add(ev.id);
+  if (S.seen.size > 4000) S.seen = new Set([...S.seen].slice(-2000));
+  const km = KM[ev.kind] || (ev.kind >= 5000 && ev.kind < 6000 ? {c:'dvm', v:'requested a DVM job'} :
+             (ev.kind >= 6000 && ev.kind < 7000 ? {c:'dvm', v:'published a DVM result'} : null));
+  if (!km) return;
+  const tags = ev.tags || [];
+  let actor = ev.pubkey, verb = km.v, appKey = null, zap = null;
+
+  if (ev.kind === 31990 || ev.kind === 31989) ingest31990(ev);
+
+  const ct = tags.find(t => t[0] === 'client');
+  if (ct && ct[1]) {
+    const k = normApp(ct[1]);
+    if (k) {
+      if (isBotKey(k)) { S.stats.bots++; return; }
+      appKey = k;
+      const a = getApp(k);
+      if (!APPS[k]) queueAppMeta(ct);
+      else { a.name = APPS[k].name; if (APPS[k].icon) a.icon = APPS[k].icon; if (APPS[k].website) a.site = APPS[k].website; }
+    }
+  }
+
+  if (ev.kind === 9735) {
+    let req = null; try { req = JSON.parse(ev.content); } catch (e) {}
+    if (req && req.pubkey) actor = req.pubkey;
+    const pT = tags.find(t => t[0] === 'p');
+    const bT = tags.find(t => t[0] === 'bolt11');
+    let sats = bolt11Sats(bT && bT[1]);
+    if (sats == null && req) { const a = (req.tags || []).find(t => t[0] === 'amount'); if (a && Number(a[1])) sats = Math.round(Number(a[1]) / 1000); }
+    const eT = tags.find(t => t[0] === 'e');
+    zap = {to: pT && pT[1], sats: sats || 0, note: eT && eT[1],
+           comment: (req && typeof req.content === 'string') ? req.content.slice(0, 140) : ''};
+    if (zap.to && S.appsByPk.has(zap.to)) {
+      const k = S.appsByPk.get(zap.to), a = getApp(k);
+      a.sats += zap.sats;
+      const h = hrB(ev.created_at || NOW());
+      a.satsH.set(h, (a.satsH.get(h) || 0) + zap.sats);
+      zap.toApp = a.name;
+      verb = zap.sats ? 'zapped ' + zap.sats.toLocaleString('en-US') + ' sats to ' + a.name : 'sent a zap to ' + a.name;
+    }
+  }
+
+  const lim = RATE_KINDS.has(ev.kind) ? 20 : (ev.kind >= 5000 && ev.kind <= 5999 ? 10 : 0);
+  if (lim > 0 && NOW() - S.bootT > 120) {
+    let r = S.rate.get(actor); const tn = NOW();
+    if (!r || tn - r.t0 > 300) { r = {t0: tn, n: 0}; S.rate.set(actor, r); }
+    r.n++;
+    if (r.n > lim) { S.stats.bots++; return; }
+  }
+
+  S.stats.ev++;
+  const t = ev.created_at || NOW();
+  S.lastEventT = t;
+  if (appKey) { S.stats.signed++; countAppEvent(getApp(appKey), actor, t); }
+  bumpBucket(S.minB, Math.floor(t / 60), km.c, 1);
+  bumpBucket(S.hrB, hrB(t), km.c, 1);
+  if (zap) {
+    S.zaps.push({t, actor, sats: zap.sats, toApp: zap.toApp || null, comment: zap.comment, note: zap.note});
+    if (S.zaps.length > 300) S.zaps.splice(0, S.zaps.length - 300);
+  }
+  if (!km.q) {
+    const item = {id: ev.id, actor, verb, cat: km.c, t, note: zap ? zap.note : ev.id,
+      preview: zap ? zap.comment : (typeof ev.content === 'string' && ev.content && ev.content[0] !== '{' ? ev.content.slice(0, 100) : ''),
+      appKey};
+    S.feed.push(item);
+    if (S.feed.length > 80) S.feed.splice(0, S.feed.length - 80);
+    if (appKey) {
+      let af = S.appFeeds.get(appKey);
+      if (!af) S.appFeeds.set(appKey, af = []);
+      af.push(item);
+      if (af.length > 30) af.shift();
+      flashCard(appKey);
+    }
+  }
+  if (!S.profiles.has(actor) && !S.pq.has(actor) && S.profiles.size < 3000) S.pq.add(actor);
+}
+
+/* ---------- render: feed & zaps ---------- */
+function renderFeed(){
+  const list = S.feed.filter(i => !S.filter || i.cat === S.filter).slice(-60).reverse();
+  $('#feed').innerHTML = list.length ? list.map(i => {
+    const a = i.appKey && S.apps.get(i.appKey);
+    const chip = a ? '<span class="app-chip">' + (a.icon ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(a.icon) + '" onerror="this.remove()">' : '') + 'via ' + esc(a.name) + '</span>' : '';
+    const prev = i.preview ? '<div class="preview">' + esc(i.preview) + '</div>' : '';
+    return '<li class="feed-item" style="--cat:' + (CATS[i.cat] || CATS.other).color + '">' +
+      '<a class="feed-row" target="_blank" rel="noreferrer" href="https://njump.me/' + esc(i.note || i.id) + '">' +
+      avHtml(i.actor) +
+      '<div class="feed-body"><div class="feed-line"><strong>' + esc(nameOf(i.actor)) + '</strong> <span>' + esc(i.verb) + '</span>' + chip + '</div>' + prev + '</div>' +
+      '<div class="feed-meta"><span class="cat-dot"></span><time>' + relTime(i.t) + '</time></div></a></li>';
+  }).join('') : '<li class="empty">Waiting for activity…</li>';
+  $('#feed-note').textContent = S.filter ? 'filtered: ' + CATS[S.filter].label : '';
+}
+function renderZaps(){
+  const t0 = NOW() - 300, recent = S.zaps.filter(z => z.t >= t0);
+  $('#zap-rate').textContent = Math.round(recent.length / 5);
+  $('#zap-sats').textContent = recent.reduce((s, z) => s + (z.sats || 0), 0).toLocaleString('en-US');
+  const list = S.zaps.slice(-30).reverse();
+  $('#zaps').innerHTML = list.length ? list.map(z =>
+    '<li class="feed-item" style="--cat:#f7931a"><a class="feed-row zap-row"' + (z.note ? ' target="_blank" rel="noreferrer" href="https://njump.me/' + esc(z.note) + '"' : '') + '>' +
+    avHtml(z.actor) +
+    '<div class="feed-body"><div class="feed-line"><strong>' + esc(nameOf(z.actor)) + '</strong> <span class="bolt">⚡</span> <span>' +
+    (z.sats ? z.sats.toLocaleString('en-US') + ' sats' : 'a zap') + (z.toApp ? ' → ' + esc(z.toApp) : '') + '</span></div>' +
+    (z.comment ? '<div class="preview">' + esc(z.comment) + '</div>' : '') + '</div>' +
+    '<div class="feed-meta"><span class="cat-dot"></span><time class="zap-time">' + relTime(z.t) + '</time></div></a></li>'
+  ).join('') : '<li class="empty">Waiting for zaps…</li>';
+}
+
+/* ---------- render: ranking ---------- */
+const sumHrs = (map, since) => { let s = 0; const h = since / 3600; for (const [k, v] of map) if (k >= h) s += v; return s; };
+const sumHrsRange = (map, hFrom, hTo) => { let s = 0; for (const [k, v] of map) if (k >= hFrom && k < hTo) s += v; return s; };
+function unionUsers(a, since, to){
+  const set = new Set(), hf = since / 3600, ht = (to || Infinity) / 3600;
+  for (const [h, us] of a.users) if (h >= hf && h < ht) for (const p of us) set.add(p);
+  return set.size;
+}
+function renderRank(){
+  const p = S.rankP, since = NOW() - p, hSince = Math.floor(since / 3600);
+  const rows = [...S.apps.values()].map(a => ({a, ev: sumHrs(a.hrs, since), sats: sumHrs(a.satsH, since),
+    users: unionUsers(a, since), isNew: a.first >= since}))
+    .filter(r => r.ev > 0 || (S.rankM === 'sats' && r.sats > 0) || (S.rankM === 'new' && r.isNew));
+  const metric = r => S.rankM === 'ev' ? r.ev : S.rankM === 'sats' ? r.sats : S.rankM === 'users' ? r.users : (r.isNew ? r.ev : -1);
+  rows.sort((x, y) => metric(y) - metric(x));
+  const top = rows.slice(0, 12), max = Math.max(1, ...top.map(metric));
+  const hNow = Math.floor(NOW() / 3600);
+  $('#rank-list').innerHTML = top.length ? top.map((r, i) => {
+    const a = r.a, cur = metric(r);
+    let pv = 0;
+    if (S.rankM === 'sats') pv = sumHrsRange(a.satsH, Math.floor((since - p) / 3600), hSince);
+    else if (S.rankM === 'users') pv = unionUsers(a, since - p, since);
+    else pv = sumHrsRange(a.hrs, Math.floor((since - p) / 3600), hSince);
+    let trend = '<span class="rank-trend flat">–</span>';
+    if (cur > 0 || pv > 0) {
+      const pct = pv > 0 ? Math.round((cur - pv) / pv * 100) : null;
+      trend = pct === null ? '<span class="rank-trend up" title="first period seen">new</span>'
+        : '<span class="rank-trend ' + (pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat') + '" title="vs. the period before">' +
+          (pct > 0 ? '↑ ' : pct < 0 ? '↓ ' : '') + Math.abs(pct) + '%</span>';
+    }
+    const lav = '<span class="letter-av">' + esc((a.name[0] || '?').toUpperCase()) + '</span>';
+    const ic = a.icon ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(a.icon) + '" onerror="this.outerHTML=\'\';">' : lav;
+    return '<li><button type="button" class="rank-row" data-app="' + esc(a.key) + '">' +
+      '<span class="rank-pos">' + (i + 1) + '</span>' + ic +
+      '<span class="rank-name">' + esc(a.name) + '</span>' +
+      '<span class="rank-bar"><span style="width:' + (cur / max * 100).toFixed(1) + '%"></span></span>' +
+      '<span class="rank-count">' + fmt(cur) + '</span>' + trend + '</button></li>';
+  }).join('') : '<li class="empty">Counting… the ranking builds from what this browser has seen — leave it open.</li>';
+}
+
+/* ---------- render: pulse ---------- */
+function renderPulse(){
+  const conf = S.pulseP === 'live' ? {cols: 30, sec: 60, src: 'min'} :
+               S.pulseP === 'day'  ? {cols: 24, sec: 3600, src: 'hr'} : {cols: 28, sec: 21600, src: 'hr'};
+  const curB = Math.floor(NOW() / conf.sec), colData = [];
+  for (let i = conf.cols - 1; i >= 0; i--) {
+    const b = curB - i, t = b * conf.sec;
+    let m = null;
+    if (conf.src === 'min') m = S.minB.get(b);
+    else if (conf.sec === 3600) m = S.hrB.get(b);
+    else { m = new Map();
+      for (let h = b * 6; h < (b + 1) * 6; h++) { const mm = S.hrB.get(h); if (mm) for (const [c, n] of mm) m.set(c, (m.get(c) || 0) + n); } }
+    colData.push({t, m: m || new Map(), total: m ? [...m.values()].reduce((x, y) => x + y, 0) : 0});
+  }
+  const max = Math.max(1, ...colData.map(c => c.total));
+  $('#pulse-bars').innerHTML = colData.map(c => {
+    const segs = Object.keys(CATS).filter(cat => (c.m.get(cat) || 0) > 0)
+      .map(cat => '<div style="height:' + ((c.m.get(cat) / max) * 100).toFixed(3) + '%;background:' + CATS[cat].color + '"></div>').join('');
+    return '<div class="pulse-col" title="' + new Date(c.t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + ' · ' + c.total + ' events">' + segs + '</div>';
+  }).join('');
+  const catCounts = new Map();
+  for (const c of colData) for (const [cat, n] of c.m) catCounts.set(cat, (catCounts.get(cat) || 0) + n);
+  $('#pulse-legend').innerHTML = Object.entries(CATS).map(([cat, cc]) =>
+    '<button class="chip' + (S.filter === cat ? ' active' : '') + '" data-cat="' + cat + '"><span class="dot" style="background:' + cc.color + '"></span>' + cc.label + ' <b>' + (catCounts.get(cat) || 0) + '</b></button>'
+  ).join('');
+}
+
+/* ---------- render: bubbles ---------- */
+const bub = {nodes: [], running: false, dirty: false};
+function rebuildBubbles(){
+  const t0 = NOW() - 300, host = $('#bubbles');
+  for (const a of S.apps.values()) while (a.ts.length && a.ts[0] < t0) a.ts.shift();
+  const act = [...S.apps.values()].filter(a => a.ts.length).sort((x, y) => y.ts.length - x.ts.length).slice(0, 14);
+  const w = host.clientWidth || 600, h = host.clientHeight || 420;
+  const keep = new Set(act.map(a => a.key));
+  bub.nodes = bub.nodes.filter(n => keep.has(n.key) && n.el && n.el.isConnected);
+  const maxN = act.length ? act[0].ts.length : 1;
+  act.forEach((a, i) => {
+    let n = bub.nodes.find(x => x.key === a.key);
+    if (!n) {
+      const ang = i * 2.399963, rad = Math.min(w, h) * (0.1 + 0.3 * (i / Math.max(1, act.length - 1))) + 8;
+      n = {key: a.key, x: w / 2 + Math.cos(ang) * rad, y: h / 2 + Math.sin(ang) * rad, px: 0, py: 0, r: 4, el: null};
+      bub.nodes.push(n);
+    }
+    n.count = a.ts.length; n.app = a;
+    n.target = Math.min(118, 18 + 26 * Math.sqrt(n.count));
+  });
+  if (!act.length) {
+    bub.nodes = [];
+    host.innerHTML = '<div class="empty">Listening to relays… apps that sign their events with the <code>client</code> tag will show up here.</div>';
+    return;
+  }
+  const emp = host.querySelector('.empty'); if (emp) emp.remove();
+  const frag = document.createDocumentFragment();
+  for (const n of bub.nodes) {
+    const a = n.app;
+    if (!n.el) {
+      const pos = document.createElement('div'); pos.className = 'bubble-pos';
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'bubble';
+      btn.addEventListener('click', () => openModal(a.key));
+      const logo = document.createElement('span'); logo.className = 'bubble-logo';
+      const nm = document.createElement('span'); nm.className = 'bubble-name'; nm.textContent = a.name;
+      const cnt = document.createElement('span'); cnt.className = 'bubble-count';
+      pos.append(btn); frag.appendChild(pos);
+      n.el = pos; n.btn = btn; n.logoEl = logo; n.nmEl = nm; n.cntEl = cnt;
+      btn.append(logo, nm, cnt);
+    }
+    n.logoEl.innerHTML = a.icon ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(a.icon) + '" onerror="this.remove()">' : '<span class="letter">' + esc((a.name[0] || '?').toUpperCase()) + '</span>';
+    n.nmEl.textContent = a.name; n.cntEl.textContent = String(n.count);
+    n.btn.classList.toggle('hot', NOW() - a.last < 4);
+    n.btn.title = a.name + ' · ' + n.count + ' events in 5 min';
+  }
+  const live = new Set(bub.nodes.map(n => n.el).filter(Boolean));
+  [...host.querySelectorAll('.bubble-pos')].forEach(el => { if (!live.has(el)) el.remove(); });
+  host.appendChild(frag);
+  bub.dirty = true;
+  if (!bub.running) { bub.running = true; requestAnimationFrame(stepBubbles); }
+}
+function stepBubbles(){
+  const host = $('#bubbles'), w = host.clientWidth, h = host.clientHeight, c = bub.nodes;
+  for (const n of c) {
+    n.r += (n.target - n.r) * (Math.abs(n.target - n.r) > 30 ? 1 : 0.15);
+    if (Math.abs(n.target - n.r) < 0.1) n.r = n.target;
+    n.x += (w / 2 - n.x) * 0.002; n.y += (h / 2 - n.y) * 0.004;
+  }
+  for (let k = 0; k < 6; k++) {
+    for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) {
+      const a = c[i], b = c[j];
+      const dx = b.x - a.x || 0.01, dy = b.y - a.y || 0.01;
+      const dd = Math.hypot(dx, dy), push = a.r + b.r + 4 - dd;
+      if (push > 0) { const f = push / dd, wt = b.r / (a.r + b.r);
+        a.x -= dx * f * wt; a.y -= dy * f * wt; b.x += dx * f * (1 - wt); b.y += dy * f * (1 - wt); }
+    }
+    for (const n of c) { n.x = Math.min(Math.max(n.x, n.r), w - n.r); n.y = Math.min(Math.max(n.y, n.r), h - n.r); }
+  }
+  let delta = 0, overlap = 0;
+  for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) {
+    const a = c[i], b = c[j];
+    overlap = Math.max(overlap, a.r + b.r + 2 - Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  for (const n of c) {
+    if (n.el) { n.el.style.width = (2 * n.r) + 'px'; n.el.style.height = (2 * n.r) + 'px'; n.el.style.transform = 'translate(' + (n.x - n.r) + 'px,' + (n.y - n.r) + 'px)'; }
+    delta = Math.max(delta, Math.abs(n.x - n.px), Math.abs(n.y - n.py)); n.px = n.x; n.py = n.y;
+  }
+  if (delta < 0.05) bub.stall = (bub.stall || 0) + 1; else bub.stall = 0;
+  if ((overlap <= 1 && bub.stall > 30) || bub.stall > 300) { bub.running = false; return; }
+  requestAnimationFrame(stepBubbles);
+}
+
+/* ---------- modal ---------- */
+function openModal(key){
+  const a = S.apps.get(key); if (!a) return;
+  const t = NOW();
+  $('#modal').innerHTML =
+    '<div style="display:flex;gap:12px;align-items:center">' +
+    (a.icon ? '<img src="' + esc(a.icon) + '" onerror="this.remove()">' : '') +
+    '<div><h3>' + esc(a.name) + '</h3>' + (a.site ? '<a class="site" target="_blank" rel="noreferrer" href="' + esc(a.site) + '">' + esc(a.site) + '</a>' : '') + '</div></div>' +
+    '<div class="kv"><span>events · 5 min</span><b>' + a.ts.length + '</b></div>' +
+    '<div class="kv"><span>events · 24 h</span><b>' + fmt(sumHrs(a.hrs, t - 86400)) + '</b></div>' +
+    '<div class="kv"><span>users · 24 h</span><b>' + fmt(unionUsers(a, t - 86400)) + '</b></div>' +
+    '<div class="kv"><span>sats received</span><b>' + (a.sats || 0).toLocaleString('en-US') + '</b></div>' +
+    '<div class="kv"><span>first seen</span><b>' + relTime(a.first) + ' ago</b></div>' +
+    '<button class="close">Close</button>';
+  $('#modal-bg').classList.add('open');
+  $('#modal .close').addEventListener('click', () => $('#modal-bg').classList.remove('open'));
+}
+$('#modal-bg').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); });
+$('#rank-list').addEventListener('click', e => { const b = e.target.closest('.rank-row'); if (b) openModal(b.dataset.app); });
+$('#pulse-legend').addEventListener('click', e => {
+  const chip = e.target.closest('.chip'); if (!chip) return;
+  S.filter = S.filter === chip.dataset.cat ? null : chip.dataset.cat;
+  renderPulse(); renderFeed();
+});
+for (const [sel, fn] of [
+  ['#rank-period', b => S.rankP = +b.dataset.p],
+  ['#rank-metric', b => S.rankM = b.dataset.m],
+  ['#pulse-period', b => { S.pulseP = b.dataset.p; renderPulse(); }]
+]) $(sel).addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  [...e.currentTarget.children].forEach(x => x.classList.toggle('active', x === b));
+  fn(b); renderRank();
+});
+
+/* ---------- apps live page ---------- */
+const appsPage = $('#apps-page');
+function flashCard(key){
+  if (!appsPage.classList.contains('open')) return;
+  const el = document.querySelector('.app-card[data-app="' + key + '"]');
+  if (!el) return;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  clearTimeout(el._ft); el._ft = setTimeout(() => el.classList.remove('flash'), 1200);
+}
+function renderAppsPage(){
+  const t = NOW();
+  const act = [...S.apps.values()].filter(a => a.ts.length).sort((x, y) => y.ts.length - x.ts.length).slice(0, 12);
+  $('#apps-grid').innerHTML = act.length ? act.map(a => {
+    const feeds = (S.appFeeds.get(a.key) || []).filter(i => i.t >= t - 300);
+    const users5 = new Set(feeds.map(i => i.actor)).size;
+    const cur = Math.floor(t / 60);
+    const vals = Array.from({length: 30}, (_, i) => a.min.get(cur - 29 + i) || 0);
+    const mx = Math.max(1, ...vals);
+    const bars = vals.map(v => '<i class="' + (v ? 'on' : '') + '" style="height:' + (v ? Math.max(8, Math.round(v / mx * 100)) : 8) + '%" title="' + v + ' events"></i>').join('');
+    const rows = feeds.slice(-10).reverse().map(it =>
+      '<div class="mini-row" style="--cat:' + (CATS[it.cat] || CATS.other).color + '"><span class="cat-dot"></span>' +
+      '<span class="who">' + esc(nameOf(it.actor)) + '</span><span class="what">' + esc(it.verb) + (it.preview ? ' — ' + esc(it.preview.slice(0, 60)) : '') + '</span>' +
+      '<time>' + relTime(it.t) + '</time></div>').join('');
+    const host = a.site ? a.site.replace(/^https?:\/\//, '').replace(/\/+$/, '') : '';
+    return '<div class="app-card panel" data-app="' + esc(a.key) + '">' +
+      '<div class="app-card-head">' +
+      (a.icon ? '<img loading="lazy" referrerpolicy="no-referrer" src="' + esc(a.icon) + '" onerror="this.remove()">' : '<span class="lav">' + esc((a.name[0] || '?').toUpperCase()) + '</span>') +
+      '<div style="min-width:0"><b>' + esc(a.name) + '</b><span class="host">' + esc(host) + '</span></div>' +
+      '<div class="app-card-stats"><b>' + a.ts.length + '</b>events · 5 min · ' + users5 + ' users' + (a.sats ? ' · ' + a.sats.toLocaleString('en-US') + ' sats' : '') + '</div></div>' +
+      '<div class="spark">' + bars + '</div>' +
+      (rows ? '<div>' + rows + '</div>' : '<div style="color:var(--muted);font-size:12px;padding:6px">waiting for events…</div>') +
+      '</div>';
+  }).join('') : '<div style="color:var(--muted);padding:40px;text-align:center">No active apps right now — listening…</div>';
+}
+function setPage(open){
+  appsPage.classList.toggle('open', open);
+  document.title = open ? 'Active apps · Radar Nostr' : '🐴 Radar Nostr';
+  if (open) renderAppsPage();
+}
+window.addEventListener('hashchange', () => setPage(location.hash === '#apps'));
+$('#apps-link').addEventListener('click', () => { location.hash = 'apps'; });
+$('#apps-back').addEventListener('click', () => { location.hash = ''; setPage(false); });
+
+/* ---------- tick + boot ---------- */
+setInterval(() => {
+  const t = NOW();
+  for (const a of S.apps.values()) {
+    for (const map of [a.hrs, a.satsH]) for (const h of map.keys()) if (h < t / 3600 - 200) map.delete(h);
+    for (const h of a.users.keys()) if (h < t / 3600 - 200) a.users.delete(h);
+    for (const m of a.min.keys()) if (m < t / 60 - 35) a.min.delete(m);
+    if (!a.ts.length && !a.hrs.size && !a.satsH.size && a.first < t - 7200) S.apps.delete(a.key);
+  }
+  for (const k of S.minB.keys()) if (k < t / 60 - 1500) S.minB.delete(k);
+  for (const k of S.hrB.keys()) if (k < t / 3600 - 200) S.hrB.delete(k);
+  const el = $('#st-relays');
+  el.innerHTML = '<b>' + S.relayOk.size + '/' + RELAYS.length + '</b><span>relays</span>';
+  el.title = RELAYS.map(r => (S.relayState.get(r) ? '● ' : '○ ') + r.replace('wss://', '')).join('\n');
+  $('#st-events').textContent = fmt(S.stats.ev);
+  let act = 0; for (const a of S.apps.values()) if (a.ts.length) act++;
+  $('#st-apps').textContent = act;
+  $('#st-signed').textContent = (S.stats.ev ? Math.round(S.stats.signed / S.stats.ev * 100) : 0) + '%';
+  $('#st-new').textContent = S.stats.news;
+  $('#st-bots').textContent = S.stats.bots;
+  $('#rank-note').textContent = 'counted 24/7 · updated ' + relTime(S.lastEventT || t) + ' ago';
+  if (t % 2 === 0) { renderFeed(); renderZaps(); rebuildBubbles(); if (appsPage.classList.contains('open')) renderAppsPage(); }
+  if (t % 10 === 0) renderRank();
+  if (t % 5 === 0 && S.pulseP === 'live') renderPulse();
+}, 1000);
+
+S.bootT = NOW();
+load();
+connectMeta();
+RELAYS.forEach((r, i) => connectRelay(r, i));
+renderFeed(); renderZaps(); renderRank(); renderPulse(); rebuildBubbles();
+setPage(location.hash === '#apps');
+setInterval(flushProfileQueue, 2500);
+setInterval(save, 30000);
+window.addEventListener('beforeunload', save);
+</script>
+</body>
+</html>
